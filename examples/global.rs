@@ -1,0 +1,20 @@
+use coat_check::initialize_static_closet;
+use coat_check::public_traits::Ticket;
+
+fn main() {
+    initialize_static_closet!();
+
+    struct MyStruct {
+        color: String,
+    }
+
+    let my_struct = MyStruct {
+        color: "blue".to_string(),
+    };
+
+    let ticket = store_in_global_closet(my_struct);
+    println!("Stored coat with ticket ID: {}", &ticket.id());
+
+    let my_struct = retrieve_from_global_closet::<MyStruct>(ticket);
+    println!("Retrieved coat color: {}", my_struct.color);
+}
