@@ -1,6 +1,8 @@
-use crate::public_traits::{Coat, Ticket};
+mod coat;
 
-pub mod public_traits;
+use std::fmt::{Display, Formatter};
+
+pub use crate::coat::Coat;
 
 /// The stored location of a Coat
 impl std::fmt::Debug for Hanger {
@@ -10,7 +12,7 @@ impl std::fmt::Debug for Hanger {
 }
 
 pub struct Hanger {
-    pub coat: Box<dyn public_traits::Coat>,
+    pub coat: Box<dyn coat::Coat>,
 }
 
 impl Hanger {
@@ -33,13 +35,13 @@ pub struct Closet {
 }
 
 impl Closet {
-    pub fn store_hanger(&self, hanger: Box<Hanger>) -> impl Ticket {
+    pub fn store_hanger(&self, hanger: Box<Hanger>) -> Ticket {
         let id = uuid::Uuid::new_v4();
         self.storage.borrow_mut().insert(id, *hanger);
-        id
+        Ticket { id }
     }
 
-    pub fn store<T: public_traits::Coat + 'static>(&self, item: T) -> impl public_traits::Ticket {
+    pub fn store<T: coat::Coat + 'static>(&self, item: T) -> Ticket {
         let hanger = Box::new(Hanger {
             coat: Box::new(item),
         });
@@ -47,16 +49,24 @@ impl Closet {
         self.store_hanger(hanger)
     }
 
-    pub fn retrieve<T: public_traits::Coat + 'static>(
-        &self,
-        ticket: impl public_traits::Ticket,
-    ) -> T {
+    pub fn retrieve<T: coat::Coat + 'static>(&self, ticket: Ticket) -> T {
         *self
             .storage
             .borrow_mut()
-            .remove(&ticket.id())
+            .remove(&ticket.id)
             .unwrap()
             .downcast::<T>()
+    }
+}
+
+/// A handle to retrieve a Coat
+pub struct Ticket {
+    id: uuid::Uuid,
+}
+
+impl Display for Ticket {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Ticket ID: {}", self.id)
     }
 }
 
@@ -73,17 +83,15 @@ macro_rules! initialize_static_closet {
             GLOBAL_CLOSET.lock().unwrap()
         }
 
-        pub fn store_in_global_closet<T>(item: T) -> impl $crate::public_traits::Ticket
+        pub fn store_in_global_closet<T>(item: T) -> Ticket
         where
-            T: $crate::public_traits::Coat + 'static,
+            T: $crate::Coat + 'static,
         {
             let closet = get_closet();
             closet.store(item)
         }
 
-        pub fn retrieve_from_global_closet<T: $crate::public_traits::Coat>(
-            ticket: impl $crate::public_traits::Ticket,
-        ) -> T {
+        pub fn retrieve_from_global_closet<T: $crate::Coat>(ticket: Ticket) -> T {
             let closet = get_closet();
             let item = closet.retrieve::<T>(ticket);
             item
