@@ -15,6 +15,6 @@ fn main() {
     let ticket = store_in_global_closet(my_struct);
     println!("Stored coat with ticket ID: {}", ticket);
 
-    let my_struct = retrieve_from_global_closet::<MyStruct>(ticket);
+    let my_struct = retrieve_from_global_closet(ticket);
     println!("Retrieved coat color: {}", my_struct.color);
 }

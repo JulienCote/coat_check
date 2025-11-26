@@ -1,6 +1,7 @@
 mod coat;
 
 use std::fmt::{Display, Formatter};
+use std::marker::PhantomData;
 
 pub use crate::coat::Coat;
 
@@ -35,21 +36,25 @@ pub struct Closet {
 }
 
 impl Closet {
-    pub fn store_hanger(&self, hanger: Box<Hanger>) -> Ticket {
+    pub fn store_hanger(&self, hanger: Box<Hanger>) -> uuid::Uuid {
         let id = uuid::Uuid::new_v4();
         self.storage.borrow_mut().insert(id, *hanger);
-        Ticket { id }
+        id
     }
 
-    pub fn store<T: coat::Coat + 'static>(&self, item: T) -> Ticket {
+    pub fn store<T: Coat + 'static>(&self, item: T) -> Ticket<T> {
         let hanger = Box::new(Hanger {
             coat: Box::new(item),
         });
 
-        self.store_hanger(hanger)
+        let id = self.store_hanger(hanger);
+        Ticket {
+            id,
+            _marker: PhantomData,
+        }
     }
 
-    pub fn retrieve<T: coat::Coat + 'static>(&self, ticket: Ticket) -> T {
+    pub fn retrieve<T: Coat + 'static>(&self, ticket: Ticket<T>) -> T {
         *self
             .storage
             .borrow_mut()
@@ -60,11 +65,12 @@ impl Closet {
 }
 
 /// A handle to retrieve a Coat
-pub struct Ticket {
+pub struct Ticket<T> {
     id: uuid::Uuid,
+    _marker: PhantomData<T>,
 }
 
-impl Display for Ticket {
+impl<T> Display for Ticket<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "Ticket ID: {}", self.id)
     }
@@ -83,7 +89,7 @@ macro_rules! initialize_static_closet {
             GLOBAL_CLOSET.lock().unwrap()
         }
 
-        pub fn store_in_global_closet<T>(item: T) -> Ticket
+        pub fn store_in_global_closet<T>(item: T) -> Ticket<T>
         where
             T: $crate::Coat + 'static,
         {
@@ -91,9 +97,9 @@ macro_rules! initialize_static_closet {
             closet.store(item)
         }
 
-        pub fn retrieve_from_global_closet<T: $crate::Coat>(ticket: Ticket) -> T {
+        pub fn retrieve_from_global_closet<T: $crate::Coat>(ticket: Ticket<T>) -> T {
             let closet = get_closet();
-            let item = closet.retrieve::<T>(ticket);
+            let item = closet.retrieve(ticket);
             item
         }
     };
@@ -116,7 +122,7 @@ mod tests {
         };
 
         let ticket = store_in_global_closet(my_coat);
-        let my_coat_ref = retrieve_from_global_closet::<MyCoat>(ticket);
+        let my_coat_ref = retrieve_from_global_closet(ticket);
         assert_eq!(my_coat_ref.color, "red");
     }
 
@@ -129,7 +135,7 @@ mod tests {
         let another_coat = AnotherCoat { size: 42 };
 
         let ticket = store_in_global_closet(another_coat);
-        let another_coat_ref = retrieve_from_global_closet::<AnotherCoat>(ticket);
+        let another_coat_ref = retrieve_from_global_closet(ticket);
         assert_eq!(another_coat_ref.size, 42);
     }
 }
